@@ -2,7 +2,8 @@
 # RodrigoGauna_TP2.py - Módulo 2: Procesamiento de datos
 # Data Engineering - UTN BA / Centro de e-Learning
 # =============================================================================
-# Lee los datos crudos almacenados por TP1 y aplica 6 transformaciones:
+# Lee los datos crudos almacenados por TP1 y aplica 7 transformaciones:
+#   T0 - Eliminación o reemplazo de nulos
 #   T1 - Eliminación de duplicados
 #   T2 - Conversión de tipos de datos
 #   T3 - Renombrado de columnas al español
@@ -35,6 +36,29 @@ def leer_delta(ruta: str, nombre: str) -> pd.DataFrame:
     return df
 
 
+# --- T0: Eliminación o reemplazo de nulos ---
+
+def t0_reemplazar_nulos(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Detecta y reemplaza valores nulos antes de cualquier otra transformación.
+      - Columnas numéricas: se reemplazan con 0 (ausencia de dato = sin medición)
+      - Columnas de texto:  se reemplazan con 'Sin dato'
+    """
+    nulos_antes = df.isnull().sum().sum()
+
+    # Reemplazar nulos en columnas numéricas con 0
+    columnas_numericas = df.select_dtypes(include=["float64", "int64"]).columns
+    df[columnas_numericas] = df[columnas_numericas].fillna(0)
+
+    # Reemplazar nulos en columnas de texto con 'Sin dato'
+    columnas_texto = df.select_dtypes(include=["object", "str"]).columns
+    df[columnas_texto] = df[columnas_texto].fillna("Sin dato")
+
+    nulos_despues = df.isnull().sum().sum()
+    print(f"  T0 [Nulos] Reemplazados: {nulos_antes - nulos_despues} | Nulos restantes: {nulos_despues}")
+    return df
+
+
 # --- T1: Eliminación de duplicados ---
 
 def t1_eliminar_duplicados(df: pd.DataFrame) -> pd.DataFrame:
@@ -59,8 +83,8 @@ def t2_convertir_tipos(df: pd.DataFrame) -> pd.DataFrame:
       - humidity_pct → int        (porcentaje, no tiene sentido como decimal)
     """
     df["time_utc"]     = pd.to_datetime(df["time_utc"])
-    df["weather_code"] = df["weather_code"].fillna(0).astype(int)
-    df["humidity_pct"] = df["humidity_pct"].fillna(0).astype(int)
+    df["weather_code"] = df["weather_code"].astype(int)
+    df["humidity_pct"] = df["humidity_pct"].astype(int)
     print(f"  T2 [Tipos] time_utc→datetime, weather_code→int, humidity_pct→int")
     return df
 
@@ -241,6 +265,7 @@ def main():
     # Paso 2: aplicar pipeline de transformaciones en orden
     print("\n[2] APLICANDO TRANSFORMACIONES")
     df = t3_renombrar_columnas(df_clima)  # T3 primero: los demás usan los nombres nuevos
+    df = t0_reemplazar_nulos(df)          # T0: limpiar nulos antes de convertir tipos
     df = t1_eliminar_duplicados(df)
     df = t2_convertir_tipos(df)
     df = t4_crear_columnas_derivadas(df)
@@ -256,7 +281,7 @@ def main():
     print("  PROCESO TP2 FINALIZADO EXITOSAMENTE")
     print(f"  Registros procesados:           {len(df_enriquecido)}")
     print(f"  Filas en resumen diario:        {len(df_resumen)}")
-    print(f"  Transformaciones aplicadas:     6")
+    print(f"  Transformaciones aplicadas:     7")
     print(f"  Destino processed/clima:        {RUTA_PROCESSED_CLIMA}")
     print(f"  Destino processed/resumen:      {RUTA_PROCESSED_RESUMEN}")
     print("="*60 + "\n")
